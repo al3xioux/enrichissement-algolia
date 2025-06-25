@@ -1,1 +1,0 @@
-from .main import prompt_test

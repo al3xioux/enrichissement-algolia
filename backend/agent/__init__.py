@@ -1,1 +1,1 @@
-from .main import ProductAnalyzer
+from .main import enrichir_champ_batch

@@ -99,27 +99,20 @@ def get_products_by_category_lvl2(index_name, category_lvl2):
 
 def get_algolia_fields(index_name):
     """
-    Récupère tous les champs disponibles dans un index Algolia.
-    
+    Récupère tous les champs disponibles dans un index Algolia en parcourant plusieurs produits.
     Args:
         index_name (str): Nom de l'index Algolia.
-        
     Returns:
         list: Liste des noms de champs disponibles.
     """
     client = get_algolia_client()
     index = client.init_index(index_name)
-    
     # Récupérer un échantillon de produits pour extraire les champs
     results = index.search('', {
-        'hitsPerPage': 1,
+        'hitsPerPage': 20,  # Prend les 20 premiers produits
         'attributesToRetrieve': ['*']
     })
-    
-    if results.get('hits'):
-        # Prendre le premier produit comme référence
-        sample_product = results['hits'][0]
-        # Retourner tous les clés (noms de champs)
-        return list(sample_product.keys())
-    
-    return []
+    champs = set()
+    for prod in results.get('hits', []):
+        champs.update(prod.keys())
+    return list(champs)

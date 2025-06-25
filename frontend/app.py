@@ -4,9 +4,11 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.GET.main import get_algolia_indexes_name, get_categories_lvl0_name, get_categories_lvl1_name, get_categories_lvl2_name, get_product_by_id, get_products_by_category_lvl1, get_products_by_category_lvl2, get_algolia_fields
+from backend.GET.main import get_algolia_indexes_name, get_categories_lvl0_name, get_categories_lvl1_name, get_categories_lvl2_name, get_product_by_id, get_products_by_category_lvl2, get_algolia_fields
 from backend.POST.main import post_new_field_to_products
-from backend.instructions.main import prompt_test
+from backend.agent.main import enrichir_champ_batch
+from backend.SupaBase.main import get_nom_categories_lvl0, get_instruction_by_nom
+from openai import OpenAI
 
 # Initialisation de la session state si elle n'existe pas
 if 'products' not in st.session_state:
@@ -37,10 +39,8 @@ st.set_page_config(
     page_title="Enrichissement Algolia",
     layout="wide"
 )
-
 # Titre de l'application
 st.title("🔄 Enrichissement Algolia")
-
 # Configuration du style pour une meilleure présentation
 st.markdown("""
     <style>
@@ -62,6 +62,8 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
+
 
 # Sidebar
 with st.sidebar:
@@ -117,15 +119,15 @@ with st.sidebar:
         category_lvl2 = None
         category_lvl2_name = []
 
-    product_name = st.text_input(
+    product_id = st.text_input(
         "ID du produit",
         placeholder="Entrez l'ID du produit...",
         help="Entrez l'identifiant unique du produit à rechercher"
     )
 
     if st.button("Lancer la recherche"):
-        if product_name:
-            st.session_state.products = get_product_by_id(index_name, product_name)
+        if product_id:
+            st.session_state.products = get_product_by_id(index_name, product_id)
         elif category_lvl2:
             category_lvl2_full = get_full_category_path(category_lvl2, category_lvl2_name)
             st.session_state.products = get_products_by_category_lvl2(index_name, category_lvl2_full)
@@ -146,8 +148,6 @@ with col_produit:
             st.markdown(f"**Nom :** {prod.get('name', 'Non disponible')}")
             if prod.get('shortDescription'):
                 st.markdown(f"**Description courte :** {prod.get('shortDescription')}")
-            if prod.get('longDescription'):
-                st.markdown(f"**Description longue :** {prod.get('longDescription')}")
         with col2:
             image_url = prod.get('ProductImageLink')
             if image_url:
@@ -175,23 +175,23 @@ with col_produit:
         st.info("Aucun produit sélectionné. Veuillez rechercher un produit par son ID ou sélectionner une catégorie.")
 
 with col_ia:
-    st.header("Assistant IA")
+    st.header("Assistant Enrichissement")
     
     with st.form("creation_champ"):
-        nouveau_champ = st.text_input(
+        new_field = st.text_input(
             "Nouveau champ",
             placeholder="Entrez le nom du champ...",
             help="Nom du champ à créer pour l'enrichissement"
         )
-        valeur_par_defaut = st.text_input(
+        default_value = st.text_input(
             "Valeur par défaut",
             placeholder="Valeur initiale du champ...",
             help="Valeur par défaut pour le nouveau champ"
         )
-        submitted_ia = st.form_submit_button("Créer le champ")
+        submitted_field = st.form_submit_button("Créer le champ")
 
-        if submitted_ia:
-            if nouveau_champ and st.session_state.products is not None:
+        if submitted_field:
+            if new_field and st.session_state.products is not None:
                 status_container = st.empty()
                 status_container.info("Traitement des produits en cours...")
 
@@ -207,12 +207,16 @@ with col_ia:
                     updated_count = post_new_field_to_products(
                         index_name, 
                         products_to_update, 
-                        nouveau_champ, 
-                        valeur_par_defaut
+                        new_field, 
+                        default_value
                     )
 
                     if updated_count > 0:
-                        status_container.success(f"✅ Le champ '{nouveau_champ}' a été ajouté à {updated_count} produit(s) avec la valeur : '{valeur_par_defaut}'")
+                        # Ajout du champ custom à la session pour la solution hybride
+                        if 'custom_fields' not in st.session_state:
+                            st.session_state.custom_fields = set()
+                        st.session_state.custom_fields.add(new_field)
+                        status_container.success(f"✅ Le champ '{new_field}' a été ajouté à {updated_count} produit(s) avec la valeur : '{default_value}'")
                     else:
                         status_container.warning("⚠️ Aucun produit n'a été mis à jour.")
                 except Exception as e:
@@ -220,18 +224,22 @@ with col_ia:
             else:
                 st.warning("⚠️ Veuillez remplir tous les champs et sélectionner des produits avant de créer un nouveau champ.")
     
-    with st.form("form_ia"):
+    with st.form("form_enrichissement"):
         # Récupérer les champs disponibles pour l'index sélectionné
         available_fields = get_algolia_fields(index_name) if index_name else []
+        # Fusionner avec les champs custom créés pendant la session
+        custom_fields = list(st.session_state.get('custom_fields', set()))
+        all_fields = sorted(set(available_fields + custom_fields))
         
         target_field = st.selectbox(
             "Champ à enrichir",
-            options=available_fields,
+            options=all_fields,
             help="Sélectionnez le champ à enrichir"
         )
-        instruction = st.selectbox(
-            "Instruction",
-            options= prompt_test,
+
+        instructions_lvl0 = st.selectbox(
+            "Instruction catégorie 0",
+            options= get_nom_categories_lvl0(),
             help="Sélectionnez l'instruction à utiliser"
         )
         source_fields = st.text_area(
@@ -242,13 +250,22 @@ with col_ia:
         envoyer = st.form_submit_button("Enrichir")
         
         if envoyer and target_field and source_fields:
-            # Utiliser directement le champ sélectionné (plus besoin d'enlever @)
-            champ_a_enrichir = target_field
-            champs_sources = [field.strip('@').strip() for field in source_fields.split(',')]
-            
-            # Formater le prompt avec les valeurs
-            prompt_formatted = prompt_test.format(
-                champ_a_enrichir=champ_a_enrichir,
-                champs_sources=', '.join(champs_sources),
-                post_new_value_for_product="post_new_value_for_product"
+            # Récupérer l'instruction système liée à la catégorie sélectionnée
+            instruction_systeme = get_instruction_by_nom(instructions_lvl0)  # 'instruction' est la catégorie sélectionnée
+            # Récupération des produits à enrichir
+            if isinstance(st.session_state.products, list):
+                produits = st.session_state.products
+            else:
+                produits = [st.session_state.products]
+            # Initialisation du client OpenAI
+            openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            # Appel de l'agent avec l'instruction système
+            nb = enrichir_champ_batch(
+                index_name=index_name,
+                produits=produits,
+                champ_cible=target_field,
+                prompt_user=source_fields,
+                openai_client=openai_client,
+                system_instruction=instruction_systeme
             )
+            st.success(f"{nb} produit(s) enrichi(s) avec succès !")
