@@ -26,13 +26,13 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
     champs_sources = set(re.findall(r"@([a-zA-Z0-9_]+)", prompt_user))
     champs_sources_str = ', '.join(champs_sources)
     if system_instruction is not None:
-        prompt_systeme = system_instruction
-    else:
         prompt_systeme = system_instruction.format(
             champ_a_enrichir=champ_cible,
             champs_sources=champs_sources_str,
             post_new_value_for_product="post_new_value_for_product"
         )
+    else:
+        prompt_systeme = f"Tu es un assistant d'enrichissement de données produit. Tu dois générer une valeur pertinente pour le champ '{champ_cible}' à partir des champs sources : {champs_sources_str}."
     for produit in produits:
         prompt = prompt_user
         for champ in champs_sources:
@@ -51,12 +51,39 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
         except Exception as e:
             print(f"Erreur OpenAI pour le produit {produit.get('objectID')}: {e}")
             valeur_enrichie = ""
-        print(f"Mise à jour {produit['objectID']} : {champ_cible} = {valeur_enrichie}")
-        success = post_new_value_for_product(index_name, produit["objectID"], champ_cible, valeur_enrichie)
+        # Jugement de la valeur enrichie
+        try:
+            prompt_jugement = (
+                f"Voici un produit : {json.dumps(produit, ensure_ascii=False)}.\n"
+                f"Le champ à enrichir est : '{champ_cible}'.\n"
+                f"Le prompt utilisateur était : '{prompt_user}'.\n"
+                f"La valeur générée est : '{valeur_enrichie}'.\n"
+                "En tant qu'expert, si la valeur générée est cohérente, pertinente et utile pour ce champ, réponds uniquement par «OK». Sinon, réécris la valeur de façon correcte et pertinente pour ce champ."
+            )
+            response_jugement = openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "Tu es un expert en data quality et enrichissement de données produit."},
+                    {"role": "user", "content": prompt_jugement}
+                ]
+            )
+            jugement = response_jugement.choices[0].message.content.strip()
+            print(f"[DEBUG JUGEMENT] Prompt envoyé :\n{prompt_jugement}\nRéponse du juge : {jugement}")
+            if jugement.strip().upper() == "OK":
+                valeur_finale = valeur_enrichie
+            else:
+                valeur_finale = jugement
+        except Exception as e:
+            print(f"Erreur lors du jugement de la valeur enrichie : {e}")
+            valeur_finale = valeur_enrichie
+        print(f"Mise à jour {produit['objectID']} : {champ_cible} = {valeur_finale}")
+        success = post_new_value_for_product(index_name, produit["objectID"], champ_cible, valeur_finale)
         print(f"Résultat Algolia : {success}")
         if success:
             nb_success += 1
     return nb_success
+
+
 
 """ # Exemple de produits (à adapter avec tes vrais produits)
 produits = [
@@ -64,17 +91,13 @@ produits = [
     {"objectID": "CHARETG2F", "name": "Chariot de rétention 220 litres", "shortDescription": " Pour le stockage et le déplacement en position verticale de fûts contenant des liquides toxiques ou polluants. Caillebotis amovible. Conforme à la norme EN 1757-3. Maniable : équipé de 4 roues en caoutchouc dont 2 pivotantes avec frein. En acier galvanisé. "}
 ]
 
-champ_cible = "motcle2"
-prompt_user = "Génère une liste de 3 mots clés à partir du nom (@name) et de la description courte (@shortDescription)."
 
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-nb = enrichir_champ_batch(
+print(enrichir_champ_batch(
     index_name="prod_raja_fr_ai_assistant_emballage_product_algolia_fr",
     produits=produits,
-    champ_cible=champ_cible,
-    prompt_user=prompt_user,
+    champ_cible="motcle2",
+    prompt_user="Génère une liste de 3 mots clés à partir de @name et de @shortDescription.",
     openai_client=openai_client
-)
-
-print(f"{nb} produits enrichis !") """
+)) """
