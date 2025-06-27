@@ -52,3 +52,7 @@ def update_instruction_category_lvl0(nom_original, nouveau_nom=None, nouvelle_in
         return None  # Rien à mettre à jour
     response = supabase.table('Instruction_categories_lvl0').update(update_data).eq('Nom', nom_original).execute()
     return response.data
+
+def post_instruction_category_lvl0(nom, instruction, instruction_juge):
+    response = supabase.table('Instruction_categories_lvl0').insert({'Nom': nom, 'Instruction': instruction, 'Instruction_juge': instruction_juge}).execute()
+    return response.data
