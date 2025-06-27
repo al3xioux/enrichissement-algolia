@@ -1,4 +1,4 @@
-algoliasearch>=2.0.0
+algoliasearch>=4.21.0
 python-dotenv
 supabase
 openai
