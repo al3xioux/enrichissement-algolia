@@ -11,9 +11,6 @@ from backend.agent.main import enrichir_champ_batch
 from backend.SupaBase.main import get_nom_instructions_categories_lvl0, get_instruction_by_nom, get_instruction_juge_by_nom
 from openai import OpenAI
 
-from streamlit_javascript import st_javascript
-import streamlit.components.v1 as components
-
 
 # Initialisation de la session state si elle n'existe pas
 if 'products' not in st.session_state:
