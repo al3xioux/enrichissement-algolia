@@ -33,8 +33,13 @@ def filter_categories_by_parent(categories, parent_category):
         return []
     return [cat for cat in categories if cat.startswith(parent_category)]
 
-
-
+def extract_object_id(prod):
+    d = prod.model_dump() if hasattr(prod, 'model_dump') else prod
+    print("[DEBUG FRONT] Produit dict:", d)
+    for key in ['objectID', 'objectId', '_objectID', '_objectId', 'object_id']:
+        if key in d:
+            return d[key]
+    return None
 
 # Configuration de la page
 st.set_page_config(
@@ -142,14 +147,15 @@ with col_produit:
     st.header("Détails du produit")
     
     def show_product_card(prod):
+        prod_dict = prod.model_dump() if hasattr(prod, 'model_dump') else prod
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.markdown(f"**ID :** {prod.get('objectID', 'Non disponible')}")
-            st.markdown(f"**Nom :** {prod.get('name', 'Non disponible')}")
-            if prod.get('shortDescription'):
-                st.markdown(f"**Description courte :** {prod.get('shortDescription')}")
+            st.markdown(f"**ID :** {prod_dict.get('objectID', 'Non disponible')}")
+            st.markdown(f"**Nom :** {prod_dict.get('name', 'Non disponible')}")
+            if prod_dict.get('shortDescription'):
+                st.markdown(f"**Description courte :** {prod_dict.get('shortDescription')}")
         with col2:
-            image_url = prod.get('ProductImageLink')
+            image_url = prod_dict.get('ProductImageLink')
             if image_url:
                 if isinstance(image_url, list):
                     image_url = image_url[0]
@@ -199,9 +205,10 @@ with col_ia:
                     # Préparation des produits pour l'API
                     products_to_update = []
                     if isinstance(st.session_state.products, list):
-                        products_to_update = [{"objectID": prod.get('objectID')} for prod in st.session_state.products]
+                        products_to_update = [{"objectID": extract_object_id(prod)} for prod in st.session_state.products]
                     else:
-                        products_to_update = [{"objectID": st.session_state.products.get('objectID')}]
+                        prod = st.session_state.products
+                        products_to_update = [{"objectID": extract_object_id(prod)}]
 
                     # Appel de la version batch
                     updated_count = post_new_field_to_products(

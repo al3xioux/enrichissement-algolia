@@ -1,7 +1,7 @@
 import sys
 import os
 from dotenv import load_dotenv
-from algoliasearch.exceptions import AlgoliaException
+from algoliasearch.search.client import SearchClientSync
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 load_dotenv()
@@ -24,12 +24,11 @@ def post_new_attribute_for_product(index_name, object_id, attribute_name, value)
     """
 
     client = get_algolia_client()
-    index = client.init_index(index_name)
-
-    response = index.partial_update_object({
+    body = {
         "objectID": object_id,
         attribute_name: value
-    })
+    }
+    response = client.partial_update_object(index_name, body, {'createIfNotExists': True})
     return True
 
 def post_new_value_for_product(index_name, product_id, field_name, new_value):
@@ -48,14 +47,13 @@ def post_new_value_for_product(index_name, product_id, field_name, new_value):
 
     try:
         client = get_algolia_client()
-        index = client.init_index(index_name)
-        
-        # Mise à jour du produit
-        index.partial_update_object({
+        body = {
             'objectID': product_id,
+            'object_id': product_id,
             field_name: new_value
-        })
-        
+        }
+        response = client.partial_update_object(index_name, body, {'createIfNotExists': True})
+        print(f"[DEBUG ALGOLIA] Réponse mise à jour produit {product_id} : {response}")
         return True
     except Exception as e:
         print(f"Erreur lors de la mise à jour du produit : {str(e)}")
@@ -76,8 +74,6 @@ def post_new_field_to_products(index_name, products, field_name, default_value="
     """
 
     client = get_algolia_client()
-    index = client.init_index(index_name)
-
     if not products:
         return 0
 
@@ -87,13 +83,15 @@ def post_new_field_to_products(index_name, products, field_name, default_value="
             'objectID': product['objectID'],
             field_name: default_value
         })
-
+    print(f"[DEBUG] Updates envoyés à Algolia : {updates}")
     try:
-        response = index.partial_update_objects(updates, {'createIfNotExists': True})
-        if isinstance(response, dict) and 'taskID' in response:
-            index.wait_task(response['taskID'])
+        response = client.partial_update_objects(index_name, updates, {'createIfNotExists': True})
+        print(f"[DEBUG] Réponse Algolia : {response}")
+        # En v4, il faut utiliser wait_for_task
+        if hasattr(response, 'task_id'):
+            client.wait_for_task(index_name, response.task_id)
         return len(updates)
-    except AlgoliaException as e:
+    except Exception as e:
         print(f"Erreur lors de la mise à jour batch : {e}")
         return 0
 

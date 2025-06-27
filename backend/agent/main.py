@@ -35,9 +35,10 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
     else:
         prompt_systeme = f"Tu es un assistant d'enrichissement de données produit. Tu dois générer une valeur pertinente pour le champ '{champ_cible}' à partir des champs sources : {champs_sources_str}."
     for produit in produits:
+        prod_dict = produit.model_dump() if hasattr(produit, 'model_dump') else produit
         prompt = prompt_user
         for champ in champs_sources:
-            valeur = str(produit.get(champ, ""))
+            valeur = str(prod_dict.get(champ, ""))
             prompt = prompt.replace(f"@{champ}", valeur)
         # Appel OpenAI avec prompt système + prompt utilisateur
         try:
@@ -50,12 +51,12 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
             )
             valeur_enrichie = response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"Erreur OpenAI pour le produit {produit.get('objectID')}: {e}")
+            print(f"Erreur OpenAI pour le produit {prod_dict.get('objectID', prod_dict.get('object_id', ''))}: {e}")
             valeur_enrichie = ""
         # Jugement de la valeur enrichie
         try:
             prompt_jugement = (
-                f"Voici un produit : {json.dumps(produit, ensure_ascii=False)}.\n"
+                f"Voici un produit : {json.dumps(prod_dict, ensure_ascii=False)}.\n"
                 f"Le champ à enrichir est : '{champ_cible}'.\n"
                 f"Le prompt utilisateur était : '{prompt_user}'.\n"
                 f"La valeur générée est : '{valeur_enrichie}'.\n"
@@ -81,9 +82,10 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
         except Exception as e:
             print(f"Erreur lors du jugement de la valeur enrichie : {e}")
             valeur_finale = valeur_enrichie
-        print(f"Mise à jour {produit['objectID']} : {champ_cible} = {valeur_finale}")
-        success = post_new_value_for_product(index_name, produit["objectID"], champ_cible, valeur_finale)
-        print(f"Résultat Algolia : {success}")
+        print(f"Mise à jour {prod_dict.get('objectID', prod_dict.get('object_id', ''))} : {champ_cible} = {valeur_finale}")
+        print(f"[DEBUG ENRICHISSEMENT] Body envoyé à Algolia : {{'objectID': {prod_dict.get('objectID', prod_dict.get('object_id', ''))}, '{champ_cible}': {valeur_finale}}}")
+        success = post_new_value_for_product(index_name, prod_dict.get("objectID", prod_dict.get("object_id", "")), champ_cible, valeur_finale)
+        print(f"[DEBUG ENRICHISSEMENT] Résultat retour post_new_value_for_product : {success}")
         if success:
             nb_success += 1
     return nb_success

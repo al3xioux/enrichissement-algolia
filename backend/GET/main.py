@@ -1,4 +1,4 @@
-from algoliasearch.search_client import SearchClient
+from algoliasearch.search.client import SearchClientSync
 import os
 from dotenv import load_dotenv
 
@@ -7,95 +7,89 @@ load_dotenv()
 def get_algolia_client():
     app_id = os.getenv("ALGOLIA_APP_ID")
     api_key = os.getenv("ALGOLIA_API_KEY")
-
-    return SearchClient.create(app_id, api_key)
+    return SearchClientSync(app_id, api_key)
 
 
 def get_algolia_indexes_name():
     client = get_algolia_client()
     response = client.list_indices()
-    items = response.get("items", [])
-    return [item.get("name") for item in items]
+    items = response.items if hasattr(response, 'items') else []
+    return [item.name for item in items]
 
 
 def get_categories_lvl0_name(index_name):
     client = get_algolia_client()
-    index = client.init_index(index_name)
-
-    results = index.search('', {
+    results = client.search_single_index(index_name, {
+        'query': '',
         'facets': ['categories.lvl0'],
         'maxValuesPerFacet': 100
     })
-
-    categories_lvl0 = results.get('facets', {}).get('categories.lvl0', {})
+    facets = getattr(results, 'facets', {}) or {}
+    categories_lvl0 = facets.get('categories.lvl0', {})
     return list(categories_lvl0.keys())
 
 
 def get_categories_lvl1_name(index_name, category_lvl0):
     client = get_algolia_client()
-    index = client.init_index(index_name)
-    
-    # Nettoyage et échappement de la catégorie
     category_lvl0 = category_lvl0.strip()
-    escaped_category = category_lvl0.replace('"', '\\"')
-
-    results = index.search('', {
+    escaped_category = category_lvl0.replace('"', '\"')
+    results = client.search_single_index(index_name, {
+        'query': '',
         'facets': ['categories.lvl1'],
         'filters': f'categories.lvl0:"{escaped_category}"',
         'maxValuesPerFacet': 100
     })
-
-    categories_lvl1 = results.get('facets', {}).get('categories.lvl1', {})
+    facets = getattr(results, 'facets', {}) or {}
+    categories_lvl1 = facets.get('categories.lvl1', {})
     return list(categories_lvl1.keys())
 
 
 def get_categories_lvl2_name(index_name, category_lvl1):
     client = get_algolia_client()
-    index = client.init_index(index_name)
-    
-    # Nettoyage et échappement de la catégorie
     category_lvl1 = category_lvl1.strip()
-    escaped_category = category_lvl1.replace('"', '\\"')
-
-    results = index.search('', {
+    escaped_category = category_lvl1.replace('"', '\"')
+    results = client.search_single_index(index_name, {
+        'query': '',
         'facets': ['categories.lvl2'],
         'filters': f'categories.lvl1:"{escaped_category}"',
         'maxValuesPerFacet': 100
     })
-
-    categories_lvl2 = results.get('facets', {}).get('categories.lvl2', {})
+    facets = getattr(results, 'facets', {}) or {}
+    categories_lvl2 = facets.get('categories.lvl2', {})
     return list(categories_lvl2.keys())
 
 
 def get_product_by_id(index_name, product_id):
     client = get_algolia_client()
-    index = client.init_index(index_name)
-
-    results = index.search('', {
-            'filters': f'objectID:{product_id}',
-            'attributesToRetrieve': ['name', 'objectID', 'MotsCles', 'shortDescription', 'longDescription', 'ProductImageLink']
-        })
-    return results.get('hits', [])[0]
+    results = client.search_single_index(index_name, {
+        'query': '',
+        'filters': f'objectID:{product_id}',
+        'attributesToRetrieve': ['name', 'objectID', 'MotsCles', 'shortDescription', 'longDescription', 'ProductImageLink']
+    })
+    hits = getattr(results, 'hits', []) or []
+    return hits[0] if hits else None
 
 def get_products_by_category_lvl1(index_name, category_lvl1):
     client = get_algolia_client()
-    index = client.init_index(index_name)
-    results = index.search('', {
+    results = client.search_single_index(index_name, {
+        'query': '',
         'filters': f'categories.lvl1:"{category_lvl1}"',
         'hitsPerPage': 100,
         'attributesToRetrieve': ['name', 'objectID', 'MotsCles', 'shortDescription', 'longDescription', 'ProductImageLink']
     })
-    return results.get('hits', [])
+    hits = getattr(results, 'hits', []) or []
+    return hits
 
 def get_products_by_category_lvl2(index_name, category_lvl2):
     client = get_algolia_client()
-    index = client.init_index(index_name)
-    results = index.search('', {
+    results = client.search_single_index(index_name, {
+        'query': '',
         'filters': f'categories.lvl2:"{category_lvl2}"',
         'hitsPerPage': 100,
         'attributesToRetrieve': ['name', 'objectID', 'MotsCles', 'shortDescription', 'longDescription', 'ProductImageLink']
     })
-    return results.get('hits', [])
+    hits = getattr(results, 'hits', []) or []
+    return hits
 
 def get_algolia_fields(index_name):
     """
@@ -106,13 +100,13 @@ def get_algolia_fields(index_name):
         list: Liste des noms de champs disponibles.
     """
     client = get_algolia_client()
-    index = client.init_index(index_name)
-    # Récupérer un échantillon de produits pour extraire les champs
-    results = index.search('', {
+    results = client.search_single_index(index_name, {
+        'query': '',
         'hitsPerPage': 20,  # Prend les 20 premiers produits
         'attributesToRetrieve': ['*']
     })
+    hits = getattr(results, 'hits', []) or []
     champs = set()
-    for prod in results.get('hits', []):
-        champs.update(prod.keys())
+    for prod in hits:
+        champs.update(prod.model_dump().keys())
     return list(champs)
