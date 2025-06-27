@@ -1,14 +1,19 @@
 import streamlit as st
 import sys
 import os
+import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.GET.main import get_algolia_indexes_name, get_categories_lvl0_name, get_categories_lvl1_name, get_categories_lvl2_name, get_product_by_id, get_products_by_category_lvl2, get_algolia_fields
 from backend.POST.main import post_new_field_to_products
 from backend.agent.main import enrichir_champ_batch
-from backend.SupaBase.main import get_nom_categories_lvl0, get_instruction_by_nom
+from backend.SupaBase.main import get_nom_instructions_categories_lvl0, get_instruction_by_nom, get_instruction_juge_by_nom
 from openai import OpenAI
+
+from streamlit_javascript import st_javascript
+import streamlit.components.v1 as components
+
 
 # Initialisation de la session state si elle n'existe pas
 if 'products' not in st.session_state:
@@ -62,8 +67,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-
 
 # Sidebar
 with st.sidebar:
@@ -223,13 +226,16 @@ with col_ia:
                     st.error(f"Erreur lors de la mise à jour : {str(e)}")
             else:
                 st.warning("⚠️ Veuillez remplir tous les champs et sélectionner des produits avant de créer un nouveau champ.")
-    
+
     with st.form("form_enrichissement"):
         # Récupérer les champs disponibles pour l'index sélectionné
         available_fields = get_algolia_fields(index_name) if index_name else []
         # Fusionner avec les champs custom créés pendant la session
         custom_fields = list(st.session_state.get('custom_fields', set()))
         all_fields = sorted(set(available_fields + custom_fields))
+        # Préparer la liste des champs pour le JS (avec @ devant chaque champ)
+        js_keywords = [f"@{field}" for field in all_fields]
+        js_keywords_json = json.dumps(js_keywords)
         
         target_field = st.selectbox(
             "Champ à enrichir",
@@ -239,26 +245,33 @@ with col_ia:
 
         instructions_lvl0 = st.selectbox(
             "Instruction catégorie 0",
-            options= get_nom_categories_lvl0(),
+            options= get_nom_instructions_categories_lvl0(),
             help="Sélectionnez l'instruction à utiliser"
         )
-        source_fields = st.text_area(
-            "Prompt",
-            placeholder="@nom, @longDescription",
-            help="Prompt + champs sources"
-        )
+        st.markdown("**Prompt**")
+        source_fields = st.text_area("Prompt", "")
+        print(f"[DEBUG] source_fields récupéré: '{source_fields}'")
         envoyer = st.form_submit_button("Enrichir")
+        print(f"[DEBUG] envoyer: {envoyer}")
         
         if envoyer and target_field and source_fields:
+            print("[DEBUG] Bouton 'Enrichir' cliqué")
+            print(f"[DEBUG] target_field: {target_field}")
+            print(f"[DEBUG] source_fields: {source_fields}")
             # Récupérer l'instruction système liée à la catégorie sélectionnée
             instruction_systeme = get_instruction_by_nom(instructions_lvl0)  # 'instruction' est la catégorie sélectionnée
+            instruction_juge = get_instruction_juge_by_nom(instructions_lvl0)
+            print(f"[DEBUG] instruction_systeme: {instruction_systeme}")
+            print(f"[DEBUG] instruction_juge: {instruction_juge}")
             # Récupération des produits à enrichir
             if isinstance(st.session_state.products, list):
                 produits = st.session_state.products
             else:
                 produits = [st.session_state.products]
+            print(f"[DEBUG] produits: {produits}")
             # Initialisation du client OpenAI
             openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            print(f"[DEBUG] openai_client: {openai_client}")
             # Appel de l'agent avec l'instruction système
             nb = enrichir_champ_batch(
                 index_name=index_name,
@@ -266,6 +279,9 @@ with col_ia:
                 champ_cible=target_field,
                 prompt_user=source_fields,
                 openai_client=openai_client,
-                system_instruction=instruction_systeme
+                system_instruction=instruction_systeme,
+                judge_instruction=instruction_juge
             )
+            print(f"[DEBUG] nb produits enrichis: {nb}")
             st.success(f"{nb} produit(s) enrichi(s) avec succès !")
+            print(f"[DEBUG] source_fields récupéré: '{source_fields}'")

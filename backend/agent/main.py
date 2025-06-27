@@ -7,7 +7,7 @@ import json
 from backend.POST.main import post_new_value_for_product
 import re
 
-def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_client, model="gpt-4o-mini", system_instruction=None):
+def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_client, model="gpt-4o-mini", system_instruction=None, judge_instruction=None):
     """
     Enrichit un champ pour une liste de produits en utilisant un prompt utilisateur libre et l'API OpenAI.
     Args:
@@ -18,6 +18,7 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
         openai_client (OpenAI): Client OpenAI déjà configuré.
         model (str): Modèle OpenAI à utiliser.
         system_instruction (str, optionnel): Prompt système à utiliser. Si None, on utilise le prompt par défaut.
+        judge_instruction (str, optionnel): Prompt système pour le juge. Si None, on utilise le prompt juge par défaut.
     Returns:
         int: Nombre de produits enrichis.
     """
@@ -60,10 +61,14 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
                 f"La valeur générée est : '{valeur_enrichie}'.\n"
                 "En tant qu'expert, si la valeur générée est cohérente, pertinente et utile pour ce champ, réponds uniquement par «OK». Sinon, réécris la valeur de façon correcte et pertinente pour ce champ."
             )
+            if judge_instruction is not None:
+                prompt_systeme_juge = judge_instruction
+            else:
+                prompt_systeme_juge = "Tu es un expert en data quality et enrichissement de données produit."
             response_jugement = openai_client.chat.completions.create(
                 model=model,
                 messages=[
-                    {"role": "system", "content": "Tu es un expert en data quality et enrichissement de données produit."},
+                    {"role": "system", "content": prompt_systeme_juge},
                     {"role": "user", "content": prompt_jugement}
                 ]
             )
