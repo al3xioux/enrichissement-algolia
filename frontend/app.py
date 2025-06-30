@@ -1,7 +1,12 @@
 import streamlit as st
+st.set_page_config(
+    page_title="Enrichissement Algolia",
+    layout="wide"
+)
 import sys
 import os
 import json
+import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -15,6 +20,46 @@ from openai import OpenAI
 # Initialisation de la session state si elle n'existe pas
 if 'products' not in st.session_state:
     st.session_state.products = None
+
+SESSION_TIMEOUT = 30 * 60  # 30 minutes en secondes
+
+# --- Authentification simple ---
+def check_password():
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if "login_time" not in st.session_state:
+        st.session_state["login_time"] = None
+
+    # Vérifier expiration de session
+    if st.session_state["logged_in"]:
+        if st.session_state["login_time"] and (time.time() - st.session_state["login_time"] > SESSION_TIMEOUT):
+            st.session_state["logged_in"] = False
+            st.session_state["login_time"] = None
+            st.warning("Session expirée, veuillez vous reconnecter.")
+            st.rerun()
+
+    if not st.session_state["logged_in"]:
+        with st.form("login_form"):
+            password = st.text_input("Mot de passe", type="password")
+            submitted = st.form_submit_button("Se connecter")
+            if submitted:
+                if password == os.getenv("PASSWORD"):
+                    st.session_state["logged_in"] = True
+                    st.session_state["login_time"] = time.time()
+                    st.success("Connexion réussie !")
+                    st.rerun()
+                else:
+                    st.error("Mot de passe incorrect")
+        st.stop()
+    else:
+        # Bouton de déconnexion
+        if st.button("Déconnexion"):
+            st.session_state["logged_in"] = False
+            st.session_state["login_time"] = None
+            st.rerun()
+
+check_password()
+# --- Fin Authentification ---
 
 def clean_category_name(category):
     """Nettoie le nom de la catégorie pour n'afficher que le dernier niveau"""
@@ -35,17 +80,11 @@ def filter_categories_by_parent(categories, parent_category):
 
 def extract_object_id(prod):
     d = prod.model_dump() if hasattr(prod, 'model_dump') else prod
-    print("[DEBUG FRONT] Produit dict:", d)
     for key in ['objectID', 'objectId', '_objectID', '_objectId', 'object_id']:
         if key in d:
             return d[key]
     return None
 
-# Configuration de la page
-st.set_page_config(
-    page_title="Enrichissement Algolia",
-    layout="wide"
-)
 # Titre de l'application
 st.title("🔄 Enrichissement Algolia")
 # Configuration du style pour une meilleure présentation
@@ -254,28 +293,19 @@ with col_ia:
         )
         st.markdown("**Prompt**")
         source_fields = st.text_area("Prompt", "")
-        print(f"[DEBUG] source_fields récupéré: '{source_fields}'")
         envoyer = st.form_submit_button("Enrichir")
-        print(f"[DEBUG] envoyer: {envoyer}")
         
         if envoyer and target_field and source_fields:
-            print("[DEBUG] Bouton 'Enrichir' cliqué")
-            print(f"[DEBUG] target_field: {target_field}")
-            print(f"[DEBUG] source_fields: {source_fields}")
             # Récupérer l'instruction système liée à la catégorie sélectionnée
             instruction_systeme = get_instruction_by_nom(instructions_lvl0)  # 'instruction' est la catégorie sélectionnée
             instruction_juge = get_instruction_juge_by_nom(instructions_lvl0)
-            print(f"[DEBUG] instruction_systeme: {instruction_systeme}")
-            print(f"[DEBUG] instruction_juge: {instruction_juge}")
             # Récupération des produits à enrichir
             if isinstance(st.session_state.products, list):
                 produits = st.session_state.products
             else:
                 produits = [st.session_state.products]
-            print(f"[DEBUG] produits: {produits}")
             # Initialisation du client OpenAI
             openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            print(f"[DEBUG] openai_client: {openai_client}")
             # Appel de l'agent avec l'instruction système
             nb = enrichir_champ_batch(
                 index_name=index_name,
@@ -286,6 +316,4 @@ with col_ia:
                 system_instruction=instruction_systeme,
                 judge_instruction=instruction_juge
             )
-            print(f"[DEBUG] nb produits enrichis: {nb}")
             st.success(f"{nb} produit(s) enrichi(s) avec succès !")
-            print(f"[DEBUG] source_fields récupéré: '{source_fields}'")

@@ -1,6 +1,51 @@
 import streamlit as st
 import sys
 import os
+import time
+
+st.set_page_config(
+    page_title="Administration des instructions",
+    layout="wide"
+)
+
+SESSION_TIMEOUT = 30 * 60  # 30 minutes en secondes
+
+def check_password():
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if "login_time" not in st.session_state:
+        st.session_state["login_time"] = None
+
+    # Vérifier expiration de session
+    if st.session_state["logged_in"]:
+        if st.session_state["login_time"] and (time.time() - st.session_state["login_time"] > SESSION_TIMEOUT):
+            st.session_state["logged_in"] = False
+            st.session_state["login_time"] = None
+            st.warning("Session expirée, veuillez vous reconnecter.")
+            st.rerun()
+
+    if not st.session_state["logged_in"]:
+        with st.form("login_form"):
+            password = st.text_input("Mot de passe", type="password")
+            submitted = st.form_submit_button("Se connecter")
+            if submitted:
+                if password == "mdp123":
+                    st.session_state["logged_in"] = True
+                    st.session_state["login_time"] = time.time()
+                    st.success("Connexion réussie !")
+                    st.rerun()
+                else:
+                    st.error("Mot de passe incorrect")
+        st.stop()
+    else:
+        # Bouton de déconnexion
+        if st.button("Déconnexion"):
+            st.session_state["logged_in"] = False
+            st.session_state["login_time"] = None
+            st.rerun()
+
+check_password()
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.SupaBase.main import get_all_instructions_categories_lvl0, update_instruction_category_lvl0, post_instruction_category_lvl0
 

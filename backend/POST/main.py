@@ -1,7 +1,7 @@
 import sys
 import os
 from dotenv import load_dotenv
-from algoliasearch.search.client import SearchClientSync
+import json
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 load_dotenv()
@@ -42,22 +42,28 @@ def post_new_value_for_product(index_name, product_id, field_name, new_value):
         new_value (str): Nouvelle valeur à ajouter.
 
     Returns:
-        bool: True si la mise à jour a réussi, False sinon.
+        dict: Réponse Algolia nettoyée si la mise à jour a réussi, None sinon.
     """
 
     try:
         client = get_algolia_client()
-        body = {
-            'objectID': product_id,
-            'object_id': product_id,
-            field_name: new_value
-        }
-        response = client.partial_update_object(index_name, body, {'createIfNotExists': True})
-        print(f"[DEBUG ALGOLIA] Réponse mise à jour produit {product_id} : {response}")
-        return True
+        response = client.partial_update_object(
+            index_name=index_name,
+            object_id=product_id,
+            attributes_to_update={
+                field_name: new_value,
+            },
+            create_if_not_exists=True
+        )
+        # Attendre la fin de la tâche si possible
+        task_id = response.get('taskID') if isinstance(response, dict) else None
+        if task_id:
+            client.wait_for_task(index_name, task_id)
+        # Nettoyage de la réponse pour éviter les problèmes de sérialisation
+        return json.loads(json.dumps(response))
     except Exception as e:
         print(f"Erreur lors de la mise à jour du produit : {str(e)}")
-        return False
+        return None
 
 def post_new_field_to_products(index_name, products, field_name, default_value=""):
     """
@@ -86,7 +92,6 @@ def post_new_field_to_products(index_name, products, field_name, default_value="
     print(f"[DEBUG] Updates envoyés à Algolia : {updates}")
     try:
         response = client.partial_update_objects(index_name, updates, {'createIfNotExists': True})
-        print(f"[DEBUG] Réponse Algolia : {response}")
         # En v4, il faut utiliser wait_for_task
         if hasattr(response, 'task_id'):
             client.wait_for_task(index_name, response.task_id)
