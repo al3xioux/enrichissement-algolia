@@ -222,53 +222,54 @@ with col_produit:
 with col_ia:
     st.header("Assistant Enrichissement")
     
-    with st.form("creation_champ"):
-        new_field = st.text_input(
-            "Nouveau champ",
-            placeholder="Entrez le nom du champ...",
-            help="Nom du champ à créer pour l'enrichissement"
-        )
-        default_value = st.text_input(
-            "Valeur par défaut",
-            placeholder="Valeur initiale du champ...",
-            help="Valeur par défaut pour le nouveau champ"
-        )
-        submitted_field = st.form_submit_button("Créer le champ")
+    with st.expander("Ajouter un champ", expanded=False):
+        with st.form("creation_champ"):
+            new_field = st.text_input(
+                "Nouveau champ",
+                placeholder="Entrez le nom du champ...",
+                help="Nom du champ à créer pour l'enrichissement"
+            )
+            default_value = st.text_input(
+                "Valeur par défaut",
+                placeholder="Valeur initiale du champ...",
+                help="Valeur par défaut pour le nouveau champ"
+            )
+            submitted_field = st.form_submit_button("Créer le champ")
 
-        if submitted_field:
-            if new_field and st.session_state.products is not None:
-                status_container = st.empty()
-                status_container.info("Traitement des produits en cours...")
+            if submitted_field:
+                if new_field and st.session_state.products is not None:
+                    status_container = st.empty()
+                    status_container.info("Traitement des produits en cours...")
 
-                try:
-                    # Préparation des produits pour l'API
-                    products_to_update = []
-                    if isinstance(st.session_state.products, list):
-                        products_to_update = [{"objectID": extract_object_id(prod)} for prod in st.session_state.products]
-                    else:
-                        prod = st.session_state.products
-                        products_to_update = [{"objectID": extract_object_id(prod)}]
+                    try:
+                        # Préparation des produits pour l'API
+                        products_to_update = []
+                        if isinstance(st.session_state.products, list):
+                            products_to_update = [{"objectID": extract_object_id(prod)} for prod in st.session_state.products]
+                        else:
+                            prod = st.session_state.products
+                            products_to_update = [{"objectID": extract_object_id(prod)}]
 
-                    # Appel de la version batch
-                    updated_count = post_new_field_to_products(
-                        index_name, 
-                        products_to_update, 
-                        new_field, 
-                        default_value
-                    )
+                        # Appel de la version batch
+                        updated_count = post_new_field_to_products(
+                            index_name, 
+                            products_to_update, 
+                            new_field, 
+                            default_value
+                        )
 
-                    if updated_count > 0:
-                        # Ajout du champ custom à la session pour la solution hybride
-                        if 'custom_fields' not in st.session_state:
-                            st.session_state.custom_fields = set()
-                        st.session_state.custom_fields.add(new_field)
-                        status_container.success(f"✅ Le champ '{new_field}' a été ajouté à {updated_count} produit(s) avec la valeur : '{default_value}'")
-                    else:
-                        status_container.warning("⚠️ Aucun produit n'a été mis à jour.")
-                except Exception as e:
-                    st.error(f"Erreur lors de la mise à jour : {str(e)}")
-            else:
-                st.warning("⚠️ Veuillez remplir tous les champs et sélectionner des produits avant de créer un nouveau champ.")
+                        if updated_count > 0:
+                            # Ajout du champ custom à la session pour la solution hybride
+                            if 'custom_fields' not in st.session_state:
+                                st.session_state.custom_fields = set()
+                            st.session_state.custom_fields.add(new_field)
+                            status_container.success(f"✅ Le champ '{new_field}' a été ajouté à {updated_count} produit(s) avec la valeur : '{default_value}'")
+                        else:
+                            status_container.warning("⚠️ Aucun produit n'a été mis à jour.")
+                    except Exception as e:
+                        st.error(f"Erreur lors de la mise à jour : {str(e)}")
+                else:
+                    st.warning("⚠️ Veuillez remplir tous les champs et sélectionner des produits avant de créer un nouveau champ.")
 
     with st.form("form_enrichissement"):
         # Récupérer les champs disponibles pour l'index sélectionné
@@ -291,6 +292,16 @@ with col_ia:
             options= get_nom_instructions_categories_lvl0(),
             help="Sélectionnez l'instruction à utiliser"
         )
+        target_index = st.selectbox(
+            "Index de destination",
+            options=get_algolia_indexes_name(),
+            help="Sélectionnez l'index de destination"
+        )
+        excel_file = st.file_uploader(
+            "Fichier Excel",
+            type=["xlsx", "xls"],
+            help="Fichier Excel pour l'enrichissement"
+        )
         st.markdown("**Prompt**")
         source_fields = st.text_area("Prompt", "")
         envoyer = st.form_submit_button("Enrichir")
@@ -308,12 +319,13 @@ with col_ia:
             openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             # Appel de l'agent avec l'instruction système
             nb = enrichir_champ_batch(
-                index_name=index_name,
+                index_name=target_index,
                 produits=produits,
                 champ_cible=target_field,
                 prompt_user=source_fields,
                 openai_client=openai_client,
                 system_instruction=instruction_systeme,
-                judge_instruction=instruction_juge
+                judge_instruction=instruction_juge,
+                excel_file=excel_file
             )
             st.success(f"{nb} produit(s) enrichi(s) avec succès !")

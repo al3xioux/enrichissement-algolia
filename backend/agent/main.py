@@ -7,7 +7,7 @@ import json
 from backend.POST.main import post_new_value_for_product
 import re
 
-def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_client, model="gpt-4o-mini", system_instruction=None, judge_instruction=None):
+def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_client, model="gpt-4o-mini", system_instruction=None, judge_instruction=None, excel_file=None):
     """
     Enrichit un champ pour une liste de produits en utilisant un prompt utilisateur libre et l'API OpenAI.
     Args:
@@ -19,6 +19,7 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
         model (str): Modèle OpenAI à utiliser.
         system_instruction (str, optionnel): Prompt système à utiliser. Si None, on utilise le prompt par défaut.
         judge_instruction (str, optionnel): Prompt système pour le juge. Si None, on utilise le prompt juge par défaut.
+        excel_file (str, optionnel): Fichier Excel à utiliser pour l'enrichissement.
     Returns:
         int: Nombre de produits enrichis.
     """
@@ -30,10 +31,11 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
         prompt_systeme = system_instruction.format(
             champ_a_enrichir=champ_cible,
             champs_sources=champs_sources_str,
-            post_new_value_for_product="post_new_value_for_product"
+            post_new_value_for_product="post_new_value_for_product",
+            excel_file=excel_file
         )
     else:
-        prompt_systeme = f"Tu es un assistant d'enrichissement de données produit. Tu dois générer une valeur pertinente pour le champ '{champ_cible}' à partir des champs sources : {champs_sources_str}."
+        prompt_systeme = f"Tu es un assistant d'enrichissement de données produit. Tu dois générer une valeur pertinente pour le champ '{champ_cible}' à partir des champs sources : {champs_sources_str}. Un excel peut être donner pour aider à la génération de la valeur."
     for produit in produits:
         prod_dict = produit.model_dump() if hasattr(produit, 'model_dump') else produit
         prompt = prompt_user
@@ -82,10 +84,7 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
         except Exception as e:
             print(f"Erreur lors du jugement de la valeur enrichie : {e}")
             valeur_finale = valeur_enrichie
-        print(f"Mise à jour {prod_dict.get('objectID', prod_dict.get('object_id', ''))} : {champ_cible} = {valeur_finale}")
-        print(f"[DEBUG ENRICHISSEMENT] Body envoyé à Algolia : {{'objectID': {prod_dict.get('objectID', prod_dict.get('object_id', ''))}, '{champ_cible}': {valeur_finale}}}")
         success = post_new_value_for_product(index_name, prod_dict.get("objectID", prod_dict.get("object_id", "")), champ_cible, valeur_finale)
-        print(f"[DEBUG ENRICHISSEMENT] Résultat retour post_new_value_for_product : {success}")
         if success:
             nb_success += 1
     return nb_success
