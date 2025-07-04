@@ -1,1 +1,1 @@
-from .main import enrichir_champ_batch
+from .main import enrichir_champ_batch, enrichir_champ_batch_excel
