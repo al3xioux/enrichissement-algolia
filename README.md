@@ -7,7 +7,6 @@ Ce projet propose une interface Streamlit permettant d'enrichir des produits sto
 - **backend** : fonctions Python pour interagir avec Algolia, Supabase et l'API OpenAI
   - `GET` : récupération des données (indexes, catégories, produits...)
   - `POST` : mise à jour des produits (création de champs ou ajout de valeurs)
-  - `DEL` : fichier prévu pour les suppressions (vide pour l'instant)
   - `SupaBase` : gestion des instructions stockées dans Supabase
   - `agent` : logique d'enrichissement en lot via OpenAI
 - **frontend** : application Streamlit
