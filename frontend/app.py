@@ -1,3 +1,5 @@
+"""Application Streamlit pour enrichir des produits via Algolia et OpenAI."""
+
 import streamlit as st
 import sys
 import os
@@ -49,7 +51,8 @@ SESSION_TIMEOUT = 30 * 60  # 30 minutes (en secondes)
 
 
 def check_password():
-    """Affiche un petit formulaire de connexion et gère la durée de session."""
+    """Gestion simple d'une authentification par mot de passe."""
+
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
     if "login_time" not in st.session_state:
@@ -225,7 +228,9 @@ with col_prod:
     st.header("Détails du produit")
 
     def show_product_card(prod):
-        d = prod.model_dump() if hasattr(prod, "model_dump") else prod
+        """Affiche une carte visuelle pour un produit."""
+
+        prod_dict = prod.model_dump() if hasattr(prod, 'model_dump') else prod
         col1, col2 = st.columns([2, 1])
         with col1:
             st.markdown(f"**object_id :** {d.get('object_id', 'N/A')}")
