@@ -93,13 +93,12 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
 
 
 
-def enrichir_champ_batch_excel(produits, champ_cible, prompt_user, openai_client,model="gpt-4o-mini", system_instruction=None, judge_instruction=None, excel_knowledge=None):
+def enrichir_champ_batch_excel(produits, champ_cible, prompt_user, openai_client,model="gpt-4o-mini", system_instruction=None, judge_instruction=None, excel_knowledge=None, progress_callback=None):
     """
     Enrichit un champ pour une liste de produits (issus d'un fichier Excel/CSV importé).
     Modifie la liste en place et retourne la liste enrichie.
     """
     produits_enrichis = []
-    # Détection des champs sources dans le prompt utilisateur (tous les @champs)
     champs_sources = set(re.findall(r"@([a-zA-Z0-9_]+)", prompt_user))
     champs_sources_str = ', '.join(champs_sources)
     if system_instruction is not None:
@@ -111,7 +110,8 @@ def enrichir_champ_batch_excel(produits, champ_cible, prompt_user, openai_client
         )
     else:
         prompt_systeme = f"Tu es un assistant d'enrichissement de données produit. Tu dois générer une valeur pertinente pour le champ '{champ_cible}' à partir des champs sources : {champs_sources_str}. Un excel peut être donné pour aider à la génération de la valeur."
-    for prod in produits:
+    total = len(produits)
+    for i, prod in enumerate(produits):
         prompt = prompt_user
         for champ in champs_sources:
             valeur = str(prod.get(champ, ""))
@@ -134,4 +134,6 @@ def enrichir_champ_batch_excel(produits, champ_cible, prompt_user, openai_client
             print(f"Erreur OpenAI pour le produit {prod.get('objectID', prod.get('object_id', ''))}: {e}")
             prod[champ_cible] = f"Erreur enrichissement: {e}"
         produits_enrichis.append(prod)
+        if progress_callback is not None:
+            progress_callback((i + 1) / total)
     return produits_enrichis

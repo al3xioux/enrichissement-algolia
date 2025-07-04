@@ -4,3 +4,7 @@ supabase
 openai
 streamlit
 streamlit-js-eval
+pandas
+openpyxl
+xlsxwriter
+requests

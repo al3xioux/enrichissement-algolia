@@ -423,6 +423,9 @@ with col_ia:
                     # Enrichissement du DataFrame Excel enrichi ou de base ----------
                     produits_excel = produits
                     nb = len(produits_excel)
+                    progress_bar = st.progress(0)
+                    def update_progress(value):
+                        progress_bar.progress(value)
                     produits_enrichis = enrichir_champ_batch_excel(
                         produits=produits_excel,
                         champ_cible=target_field,
@@ -430,8 +433,10 @@ with col_ia:
                         openai_client=openai_client,
                         system_instruction=instruction_systeme,
                         judge_instruction=instruction_juge,
-                        excel_knowledge=knowledge_data
+                        excel_knowledge=knowledge_data,
+                        progress_callback=update_progress
                     )
+                    progress_bar.empty()
                     st.success(f"{nb} ligne(s) enrichie(s) dans le fichier ⚡️")
                     # Générer le fichier Excel enrichi et bouton de téléchargement
                     df_enrichi = pd.DataFrame(produits_enrichis)
