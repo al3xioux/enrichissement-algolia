@@ -1,3 +1,5 @@
+"""Application Streamlit pour enrichir des produits via Algolia et OpenAI."""
+
 import streamlit as st
 st.set_page_config(
     page_title="Enrichissement Algolia",
@@ -25,6 +27,8 @@ SESSION_TIMEOUT = 30 * 60  # 30 minutes en secondes
 
 # --- Authentification simple ---
 def check_password():
+    """Gestion simple d'une authentification par mot de passe."""
+
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
     if "login_time" not in st.session_state:
@@ -79,6 +83,8 @@ def filter_categories_by_parent(categories, parent_category):
     return [cat for cat in categories if cat.startswith(parent_category)]
 
 def extract_object_id(prod):
+    """Extrait l'identifiant d'un produit quelle que soit la clé employée."""
+
     d = prod.model_dump() if hasattr(prod, 'model_dump') else prod
     for key in ['objectID', 'objectId', '_objectID', '_objectId', 'object_id']:
         if key in d:
@@ -186,6 +192,8 @@ with col_produit:
     st.header("Détails du produit")
     
     def show_product_card(prod):
+        """Affiche une carte visuelle pour un produit."""
+
         prod_dict = prod.model_dump() if hasattr(prod, 'model_dump') else prod
         col1, col2 = st.columns([2, 1])
         with col1:

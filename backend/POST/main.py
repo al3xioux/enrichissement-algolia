@@ -1,3 +1,5 @@
+"""Fonctions d'ajout ou de mise à jour des produits sur Algolia."""
+
 import sys
 import os
 from dotenv import load_dotenv
@@ -101,4 +103,11 @@ def post_new_field_to_products(index_name, products, field_name, default_value="
         return 0
 
 
-""" post_new_field_to_products("prod_raja_fr_ai_assistant_emballage_product_algolia_fr", [{"objectID": "OFF_FR_491"},{"objectID": "LOCGYR60"}], "test", "test") """
+"""Example call
+post_new_field_to_products(
+    "prod_raja_fr_ai_assistant_emballage_product_algolia_fr",
+    [{"objectID": "OFF_FR_491"}, {"objectID": "LOCGYR60"}],
+    "test",
+    "test",
+)
+"""

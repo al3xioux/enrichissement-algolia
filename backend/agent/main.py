@@ -1,3 +1,5 @@
+"""Agent d'enrichissement utilisant l'API OpenAI."""
+
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 import os
@@ -91,19 +93,31 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
 
 
 
-""" # Exemple de produits (à adapter avec tes vrais produits)
+"""
+# Exemple de produits (à adapter avec vos propres données)
 produits = [
-    {"objectID": "2702RET", "name": "Chariot de rétention porte-fût 45/54 litres 113x61,1x99 cm", "shortDescription": " Pour le déplacement de 2 fûts de 200 litres. Conforme à la norme EN 1757-3. Maniable : équipé de 4 roues Ø 12,5 cm, dont 2 pivotantes avec frein. Bac étanche. Caillebotis, grille de 31 x 31 mm. En acier finition époxy bleu. "},
-    {"objectID": "CHARETG2F", "name": "Chariot de rétention 220 litres", "shortDescription": " Pour le stockage et le déplacement en position verticale de fûts contenant des liquides toxiques ou polluants. Caillebotis amovible. Conforme à la norme EN 1757-3. Maniable : équipé de 4 roues en caoutchouc dont 2 pivotantes avec frein. En acier galvanisé. "}
+    {
+        "objectID": "2702RET",
+        "name": "Chariot de rétention porte-fût 45/54 litres 113x61,1x99 cm",
+        "shortDescription": " Pour le déplacement de 2 fûts de 200 litres. Conforme à la norme EN 1757-3. Maniable : équipé de 4 roues Ø 12,5 cm, dont 2 pivotantes avec frein. Bac étanche. Caillebotis, grille de 31 x 31 mm. En acier finition époxy bleu. "
+    },
+    {
+        "objectID": "CHARETG2F",
+        "name": "Chariot de rétention 220 litres",
+        "shortDescription": " Pour le stockage et le déplacement en position verticale de fûts contenant des liquides toxiques ou polluants. Caillebotis amovible. Conforme à la norme EN 1757-3. Maniable : équipé de 4 roues en caoutchouc dont 2 pivotantes avec frein. En acier galvanisé. "
+    }
 ]
-
 
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-print(enrichir_champ_batch(
-    index_name="prod_raja_fr_ai_assistant_emballage_product_algolia_fr",
-    produits=produits,
-    champ_cible="motcle2",
-    prompt_user="Génère une liste de 3 mots clés à partir de @name et de @shortDescription.",
-    openai_client=openai_client
-)) """
+print(
+    enrichir_champ_batch(
+        index_name="prod_raja_fr_ai_assistant_emballage_product_algolia_fr",
+        produits=produits,
+        champ_cible="motcle2",
+        prompt_user="Génère une liste de 3 mots clés à partir de @name et de @shortDescription.",
+        openai_client=openai_client,
+    )
+)
+"""
+
