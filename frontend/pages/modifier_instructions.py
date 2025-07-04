@@ -1,3 +1,5 @@
+"""Page Streamlit d'administration des instructions Supabase."""
+
 import streamlit as st
 import sys
 import os
@@ -11,6 +13,8 @@ st.set_page_config(
 SESSION_TIMEOUT = 30 * 60  # 30 minutes en secondes
 
 def check_password():
+    """Authentification basique par mot de passe."""
+
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
     if "login_time" not in st.session_state:
