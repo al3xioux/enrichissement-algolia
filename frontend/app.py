@@ -233,12 +233,12 @@ with col_prod:
         prod_dict = prod.model_dump() if hasattr(prod, 'model_dump') else prod
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.markdown(f"**object_id :** {d.get('object_id', 'N/A')}")
-            st.markdown(f"**name :** {d.get('name', 'N/A')}")
-            if d.get("shortDescription"):
-                st.markdown(f"**shortDescription :** {d.get('shortDescription')}")
+            st.markdown(f"**object_id :** {prod_dict.get('object_id', 'N/A')}")
+            st.markdown(f"**name :** {prod_dict.get('name', 'N/A')}")
+            if prod_dict.get("shortDescription"):
+                st.markdown(f"**shortDescription :** {prod_dict.get('shortDescription')}")
         with col2:
-            img_url = d.get("ProductImageLink")
+            img_url = prod_dict.get("ProductImageLink")
             if isinstance(img_url, list):
                 img_url = img_url[0]
             elif isinstance(img_url, dict):
@@ -364,11 +364,11 @@ with col_ia:
             target_index = index_name  # pas utilisé mais requis dans l'appel de l'agent
 
         # 📂 Uploader Excel spécifique à l'enrichissement (placé DANS le form)
-        excel_file = st.file_uploader(
-            "Fichier Excel pour enrichissement (optionnel)",
+        excel_knowledge_file = st.file_uploader(
+            "Fichier Excel de connaissance pour le LLM (optionnel)",
             type=["xlsx", "xls", "csv"],
-            key="excel_for_enrichissement",
-            help="Permet d'enrichir directement un fichier sans passer par l'index",
+            key="excel_knowledge_file",
+            help="Fichier de contexte supplémentaire pour le LLM. N'est PAS la liste des produits à enrichir.",
         )
 
         st.markdown("**Prompt**")
@@ -393,7 +393,9 @@ with col_ia:
                 df_excel = st.session_state.excel_products_df
             else:
                 df_excel = None
-            if isinstance(st.session_state.products, list):
+            if df_excel is not None:
+                produits = df_excel.to_dict(orient="records")
+            elif isinstance(st.session_state.products, list):
                 produits = st.session_state.products
             elif st.session_state.products is not None:
                 produits = [st.session_state.products]
@@ -403,37 +405,23 @@ with col_ia:
             # Client OpenAI
             openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-            # Appel de l'agent (mode Algolia ou Excel)
+            # Lecture du fichier de connaissance (optionnel)
+            knowledge_data = None
+            if excel_knowledge_file is not None:
+                try:
+                    if excel_knowledge_file.name.lower().endswith(".csv"):
+                        knowledge_data = pd.read_csv(excel_knowledge_file)
+                    else:
+                        knowledge_data = pd.read_excel(excel_knowledge_file)
+                except Exception as exc:
+                    st.error(f"Erreur lors de la lecture du fichier de connaissance : {exc}")
+                    knowledge_data = None
+
+            # Appel de l'agent (mode Excel ou Algolia)
             try:
-                if excel_file is not None:
-                    # Enrichissement direct d'un fichier Excel/CSV -------------------
-                    try:
-                        if excel_file.name.lower().endswith(".csv"):
-                            df_uploaded = pd.read_csv(excel_file)
-                        else:
-                            df_uploaded = pd.read_excel(excel_file)
-                        produits_excel = df_uploaded.to_dict(orient="records")
-                        nb = len(produits_excel)
-                        produits_enrichis = enrichir_champ_batch_excel(
-                            produits=produits_excel,
-                            champ_cible=target_field,
-                            prompt_user=source_fields,
-                            openai_client=openai_client,
-                            system_instruction=instruction_systeme,
-                            judge_instruction=instruction_juge,
-                        )
-                        st.success(f"{nb} ligne(s) enrichie(s) dans le fichier ⚡️")
-                        # Générer le fichier Excel enrichi et bouton de téléchargement
-                        df_enrichi = pd.DataFrame(produits_enrichis)
-                        tmp_output = io.BytesIO()
-                        df_enrichi.to_excel(tmp_output, index=False, engine="xlsxwriter")
-                        tmp_output.seek(0)
-                        st.session_state.tmp_excel_enrichi = tmp_output
-                    except Exception as exc:
-                        st.error(f"Erreur lors de la lecture du fichier : {exc}")
-                elif df_excel is not None:
+                if df_excel is not None:
                     # Enrichissement du DataFrame Excel enrichi ou de base ----------
-                    produits_excel = df_excel.to_dict(orient="records")
+                    produits_excel = produits
                     nb = len(produits_excel)
                     produits_enrichis = enrichir_champ_batch_excel(
                         produits=produits_excel,
@@ -442,7 +430,7 @@ with col_ia:
                         openai_client=openai_client,
                         system_instruction=instruction_systeme,
                         judge_instruction=instruction_juge,
-                        excel_file=excel_file
+                        excel_knowledge=knowledge_data
                     )
                     st.success(f"{nb} ligne(s) enrichie(s) dans le fichier ⚡️")
                     # Générer le fichier Excel enrichi et bouton de téléchargement
@@ -461,7 +449,7 @@ with col_ia:
                         openai_client=openai_client,
                         system_instruction=instruction_systeme,
                         judge_instruction=instruction_juge,
-                        excel_file=excel_file
+                        excel_knowledge=knowledge_data
                     )
                     st.success(f"{nb} produit(s) enrichi(s) avec succès !")
             except Exception as exc:

@@ -9,7 +9,7 @@ import json
 from backend.POST.main import post_new_value_for_product
 import re
 
-def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_client, model="gpt-4o-mini", system_instruction=None, judge_instruction=None, excel_file=None):
+def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_client, model="gpt-4o-mini", system_instruction=None, judge_instruction=None, excel_knowledge=None):
     """
     Enrichit un champ pour une liste de produits en utilisant un prompt utilisateur libre et l'API OpenAI.
     Args:
@@ -34,7 +34,7 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
             champ_a_enrichir=champ_cible,
             champs_sources=champs_sources_str,
             post_new_value_for_product="post_new_value_for_product",
-            excel_file=excel_file
+            excel_file=excel_knowledge
         )
     else:
         prompt_systeme = f"Tu es un assistant d'enrichissement de données produit. Tu dois générer une valeur pertinente pour le champ '{champ_cible}' à partir des champs sources : {champs_sources_str}. Un excel peut être donner pour aider à la génération de la valeur."
@@ -93,7 +93,7 @@ def enrichir_champ_batch(index_name, produits, champ_cible, prompt_user, openai_
 
 
 
-def enrichir_champ_batch_excel(produits, champ_cible, prompt_user, openai_client,model="gpt-4o-mini", system_instruction=None, judge_instruction=None, excel_file=None):
+def enrichir_champ_batch_excel(produits, champ_cible, prompt_user, openai_client,model="gpt-4o-mini", system_instruction=None, judge_instruction=None, excel_knowledge=None):
     """
     Enrichit un champ pour une liste de produits (issus d'un fichier Excel/CSV importé).
     Modifie la liste en place et retourne la liste enrichie.
@@ -107,7 +107,7 @@ def enrichir_champ_batch_excel(produits, champ_cible, prompt_user, openai_client
             champ_a_enrichir=champ_cible,
             champs_sources=champs_sources_str,
             post_new_value_for_product="",
-            excel_file=excel_file
+            excel_file=excel_knowledge
         )
     else:
         prompt_systeme = f"Tu es un assistant d'enrichissement de données produit. Tu dois générer une valeur pertinente pour le champ '{champ_cible}' à partir des champs sources : {champs_sources_str}. Un excel peut être donné pour aider à la génération de la valeur."
